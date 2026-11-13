@@ -9,7 +9,7 @@ MetroCC is an interactive web app that compiles a small domain-specific language
 | 3 | Semantic analysis | Pass/fail checklist per statement, annotated (attributed) tree, symbol table |
 | 4 | Intermediate code | Numbered three-address IR, basic blocks / control-flow graph |
 | 5 | Optimization | Toggleable passes, before/after IR diff, metrics, Dijkstra route suggestions (fastest and fewest changes) emitted as loadable source |
-| 6 | Code generation | Human-readable itinerary with an optional clock schedule, animated schematic metro map |
+| 6 | Code generation | Three targets from one IR (itinerary, journey card, JSON) with copy/download, optional clock schedule, animated schematic metro map |
 
 The compiler is pure TypeScript in [src/compiler/](src/compiler/). It has no backend and uses no parser generator: the lexer and parser are hand-written. Every phase is a pure function that returns `{ ok, result, steps, diagnostics }`; the UI animates the `steps`.
 
@@ -22,7 +22,7 @@ Requirements: Node 18+ (tested on Node 22).
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # 136 unit tests (vitest)
+npm test           # 142 unit tests (vitest)
 npm run build      # type-check + production build into dist/
 ```
 
@@ -253,6 +253,29 @@ Each alternative is translated back into MetroCC source (`pathToSource`) and sho
 
 ---
 
+## Code generation targets
+
+Phase 6 lowers the optimised IR to three target "languages", the way a compiler keeps one IR and plugs in one back end per machine. Pick one with the **Target** tabs in the Code Generation view; each can be copied or downloaded.
+
+| Target | File | Contents |
+|---|---|---|
+| Itinerary | `itinerary.txt` | Numbered human instructions with platform direction, per-ride time and distance, and clock times when a departure time is given |
+| Journey card | `journey-card.txt` | Fixed-width printable card: every station passed, each interchange, estimated time, distance and fare |
+| JSON | `journey.json` | Machine-readable `metrocc-journey` document (legs, changes, summary) for other programs |
+
+Both new back ends share one lowering step (`lowerToJourney`). Tests check that the JSON totals match the summary, that the legs chain end to start, and that every row of the card has the same width.
+
+---
+
+## Future scope
+
+- Model more lines (Pink, Magenta, Airport Express) and walking-time differences between interchanges.
+- A real timetable: first/last trains per station and peak/off-peak headways instead of a fixed service window.
+- A same-line branch-change statement, so Green Line routes through Ashok Park Main can be written in the language.
+- More code-generation targets, e.g. GTFS-style trip data or an iCalendar event for a timed journey.
+
+---
+
 ## Project structure
 
 ```
@@ -266,6 +289,7 @@ src/
     ir/irgen.ts                 phase 4: three-address IR, basic blocks, metrics
     optimizer/                  phase 5: four passes + driver
     codegen/codegen.ts          phase 6: itinerary + animation path
+    codegen/targets.ts          phase 6 back ends: journey card and JSON targets
     pipeline.ts                 runs the phases, stops at the first failing one
     __tests__/                  one test file per phase + presets + data integrity
   examples/presets.ts           demo programs (valid and invalid), also run as tests

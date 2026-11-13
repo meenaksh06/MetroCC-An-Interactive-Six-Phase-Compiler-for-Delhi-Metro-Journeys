@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { spanContains } from '../../compiler/diagnostics';
+import { TARGETS, type TargetId } from '../../compiler/codegen/targets';
 import { lineColor } from '../../compiler/data/graph';
 import { MetroMap } from '../components/MetroMap';
 import { useStore } from '../store';
@@ -14,6 +15,9 @@ export function CodegenView() {
   const cur = Math.min(step, items.length - 1);
   const [replay, setReplay] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [target, setTarget] = useState<TargetId>('text');
+  const tgt = TARGETS.find((t) => t.id === target)!;
+  const output = cg.result.targets[target];
   const revealedRides = items.slice(0, cur + 1).filter((s) => s.kind === 'ride').length;
   const s = cg.result.summary;
 
@@ -24,12 +28,21 @@ export function CodegenView() {
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(cg.result.text);
+      await navigator.clipboard.writeText(output);
       setCopied(true);
       setTimeout(() => setCopied(false), 1200);
     } catch {
       /* clipboard unavailable */
     }
+  };
+
+  const download = () => {
+    const url = URL.createObjectURL(new Blob([output], { type: tgt.mime }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = tgt.file;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -51,33 +64,49 @@ export function CodegenView() {
           ))}
         </div>
         <div className="card flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="card-title">
-            Itinerary (target code)
-            <button className="btn ml-auto px-2 py-0.5 text-xs normal-case tracking-normal" onClick={copy}>{copied ? '✓ Copied' : 'Copy text'}</button>
-          </div>
-          <ol className="min-h-0 flex-1 space-y-1.5 overflow-auto p-3">
-            {items.slice(0, cur + 1).map((it, i) => (
-              <motion.li
-                key={it.instrId + i}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`flex gap-3 rounded-lg border-l-4 px-3 py-2 ${i === cur ? 'row-step' : ''} ${spanContains(it.span, editorHover ?? -1) ? 'row-hl' : ''}`}
-                style={{ borderColor: it.line ? lineColor(it.line) : 'var(--border)', background: i === cur ? undefined : 'var(--panel-2)' }}
-                onMouseEnter={() => setHover(it.span)}
-                onMouseLeave={() => setHover(null)}
+          <div className="card-title flex-wrap gap-1">
+            Target
+            {TARGETS.map((t) => (
+              <button
+                key={t.id}
+                className={`btn px-2 py-0.5 text-xs normal-case tracking-normal ${t.id === target ? 'font-bold' : 'opacity-70'}`}
+                style={t.id === target ? { borderColor: 'var(--accent)' } : undefined}
+                onClick={() => setTarget(t.id)}
+                aria-pressed={t.id === target}
               >
-                <span className="text-lg">{KIND_ICON[it.kind]}</span>
-                {it.time && <span className="mono mt-0.5 h-fit rounded px-1.5 text-xs font-semibold" style={{ background: 'var(--panel)' }}>{it.time}</span>}
-                <div>
-                  <div className="text-[14px] font-medium">
-                    <span className="muted mr-1">{i + 1}.</span>
-                    {it.text}
-                  </div>
-                  {it.detail && <div className="mt-0.5 text-xs muted">{it.detail}</div>}
-                </div>
-              </motion.li>
+                {t.title}
+              </button>
             ))}
-          </ol>
+            <button className="btn ml-auto px-2 py-0.5 text-xs normal-case tracking-normal" onClick={copy}>{copied ? '✓ Copied' : 'Copy'}</button>
+            <button className="btn px-2 py-0.5 text-xs normal-case tracking-normal" onClick={download} title={`Download ${tgt.file}`}>⬇ {tgt.file}</button>
+          </div>
+          {target !== 'text' ? (
+            <pre className="mono min-h-0 flex-1 overflow-auto p-3 text-[12px] leading-snug">{output}</pre>
+          ) : (
+            <ol className="min-h-0 flex-1 space-y-1.5 overflow-auto p-3">
+              {items.slice(0, cur + 1).map((it, i) => (
+                <motion.li
+                  key={it.instrId + i}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`flex gap-3 rounded-lg border-l-4 px-3 py-2 ${i === cur ? 'row-step' : ''} ${spanContains(it.span, editorHover ?? -1) ? 'row-hl' : ''}`}
+                  style={{ borderColor: it.line ? lineColor(it.line) : 'var(--border)', background: i === cur ? undefined : 'var(--panel-2)' }}
+                  onMouseEnter={() => setHover(it.span)}
+                  onMouseLeave={() => setHover(null)}
+                >
+                  <span className="text-lg">{KIND_ICON[it.kind]}</span>
+                  {it.time && <span className="mono mt-0.5 h-fit rounded px-1.5 text-xs font-semibold" style={{ background: 'var(--panel)' }}>{it.time}</span>}
+                  <div>
+                    <div className="text-[14px] font-medium">
+                      <span className="muted mr-1">{i + 1}.</span>
+                      {it.text}
+                    </div>
+                    {it.detail && <div className="mt-0.5 text-xs muted">{it.detail}</div>}
+                  </div>
+                </motion.li>
+              ))}
+            </ol>
+          )}
           <div className="border-t px-3 py-2 text-xs muted" style={{ borderColor: 'var(--border)' }}>
             Fare is charged on the shortest-distance path ({s.fareKm} km), as DMRC does. Time includes ~5 min per interchange.{s.depart ? ' Clock times are estimates from the running-time model, not a timetable.' : ' Add “AT HH:MM” to the BOARD statement for clock times.'}
           </div>

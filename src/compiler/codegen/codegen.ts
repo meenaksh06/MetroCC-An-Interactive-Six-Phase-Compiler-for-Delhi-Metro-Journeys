@@ -7,6 +7,7 @@ import { DiagnosticSink } from '../diagnostics';
 import { INTERCHANGE_MIN, SERVICE_END_MIN, formatClock, lineById, rideInfo, shortestPath } from '../data/graph';
 import { metrics, type IRInstr, type IRMetrics } from '../ir/irgen';
 import type { LineId, PhaseResult, Span } from '../types';
+import { emitCard, emitJson, lowerToJourney, type JourneyDoc, type TargetId } from './targets';
 
 export interface ItineraryStep {
   kind: 'board' | 'ride' | 'pass' | 'change' | 'exit';
@@ -26,6 +27,10 @@ export interface CodegenOutput {
   summary: IRMetrics & { fareKm: number; depart?: string; arrive?: string };
   /** map animation path: one entry per ride */
   path: { line: LineId; stations: string[] }[];
+  /** structured journey shared by the card and JSON back ends */
+  journey: JourneyDoc;
+  /** the same program emitted for every target (multi-target code generation) */
+  targets: Record<TargetId, string>;
 }
 
 export type CodegenStep = { item: number; message: string };
@@ -101,9 +106,12 @@ export function generate(ir: IRInstr[]): PhaseResult<CodegenOutput, CodegenStep>
     ...(summary.depart ? [`Depart ${summary.depart} · arrive ≈ ${summary.arrive}`] : []),
   ].join('\n');
 
+  const journey = lowerToJourney(ir, m, fareKm);
+  const targets: Record<TargetId, string> = { text: text + '\n', card: emitCard(journey), json: emitJson(journey) };
+
   return {
     ok: true, // warnings only — code generation cannot fail on a checked program
-    result: { steps: out, text, summary, path },
+    result: { steps: out, text, summary, path, journey, targets },
     steps: out.map((s, i) => ({ item: i, message: s.text })),
     diagnostics: diags.list,
   };

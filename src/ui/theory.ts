@@ -59,7 +59,7 @@ export const THEORY: Record<PhaseId, { heading: string; points: string[] }> = {
     points: [
       'The target language is human instructions plus an animation path. Each IR opcode has a template (BOARD → "Board the … at … towards …"), which is instruction selection in its simplest form.',
       'Target-specific information is added here: platform direction ("towards" a terminus) from the station order, travel time, distance, and the DMRC fare. With a departure time, a running clock is threaded through the IR so every step gets an estimated clock time. DMRC charges by the shortest-distance path, so a detour costs time but not money.',
-      'The map shows the generated "program" being executed: the train marker runs the itinerary step by step.',
+      'The map shows the generated "program" being executed: the train marker runs the itinerary step by step. The same IR is also lowered to two more targets, a printable journey card and JSON, which is multi-target code generation in miniature.',
     ],
   },
 };
