@@ -8,7 +8,7 @@ MetroCC is an interactive web app that compiles a small domain-specific language
 | 2 | Syntax analysis | LL(1) PDA trace (stack / input / action, INIT → ACCEPT), parse tree and AST, FIRST/FOLLOW sets, LL(1) table |
 | 3 | Semantic analysis | Pass/fail checklist per statement, annotated (attributed) tree, symbol table |
 | 4 | Intermediate code | Numbered three-address IR, basic blocks / control-flow graph |
-| 5 | Optimization | Toggleable passes, before/after IR diff, metrics, Dijkstra route suggestion |
+| 5 | Optimization | Toggleable passes, before/after IR diff, metrics, Dijkstra route suggestions (fastest and fewest changes) emitted as loadable source |
 | 6 | Code generation | Human-readable itinerary with an optional clock schedule, animated schematic metro map |
 
 The compiler is pure TypeScript in [src/compiler/](src/compiler/). It has no backend and uses no parser generator: the lexer and parser are hand-written. Every phase is a pure function that returns `{ ok, result, steps, diagnostics }`; the UI animates the `steps`.
@@ -22,7 +22,7 @@ Requirements: Node 18+ (tested on Node 22).
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # 124 unit tests (vitest)
+npm test           # 136 unit tests (vitest)
 npm run build      # type-check + production build into dist/
 ```
 
@@ -239,7 +239,17 @@ Semantic warnings and notes:
 - The fare follows DMRC practice and is charged on the shortest-distance path.
 - With `AT HH:MM`, code generation runs a clock through the IR: each RIDE adds its running time, each TRANSFER adds 5 min. Every itinerary step gets a time, and arrival = departure + total time. These are estimates from the model, not a timetable.
 
-The graph ([graph.ts](src/compiler/data/graph.ts)) has one node per line-copy of a station. Edges join adjacent stations on a line, and interchange edges join the copies of the same station. Dijkstra runs over this graph.
+The graph ([graph.ts](src/compiler/data/graph.ts)) has one node per line-copy of a station. Edges join adjacent stations on a line, and interchange edges join the copies of the same station. Dijkstra runs over this graph with one of three cost functions:
+
+| Metric | Edge cost | Used for |
+|---|---|---|
+| `time` | ride minutes; interchange = 5 min | fastest route (route-optimality pass) |
+| `transfers` | ride minutes; interchange = 10 000 + 5 min | fewest changes, ties broken by time |
+| `distance` | km; interchange ≈ 0 | DMRC fare (charged on the shortest path) |
+
+The `transfers` penalty is larger than any whole journey on this map, so Dijkstra minimises the pair (changes, minutes) in lexicographic order with an ordinary scalar cost.
+
+Each alternative is translated back into MetroCC source (`pathToSource`) and shown with a **Load into editor** button. Every emitted program is checked by a test to compile to the same route. A route that switches Green Line branches at Ashok Park Main is split into two legs, because no single train serves both branches. The language has no syntax for a same-line branch change, so such routes are shown without source.
 
 ---
 

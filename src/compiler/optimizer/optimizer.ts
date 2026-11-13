@@ -3,7 +3,7 @@
  *   1. redundant-transfer elimination   (peephole)
  *   2. dead-VIA removal                 (dead-code elimination)
  *   3. segment merging                  (instruction combining)
- *   4. route-optimality analysis        (global analysis via Dijkstra; suggestion only)
+ *   4. route-optimality analysis        (global analysis via Dijkstra: fastest + fewest changes; suggestion only)
  */
 import { basicBlocks, metrics, type BasicBlock, type IRInstr, type IRMetrics } from '../ir/irgen';
 import type { PhaseResult } from '../types';
@@ -18,7 +18,7 @@ export const PASSES: { id: PassId; title: string; kind: string; description: str
   { id: 'redundantTransfer', title: 'Redundant-transfer elimination', kind: 'peephole', description: 'Drops a transfer to the same line, a change followed by an immediate change back, and fuses back-to-back transfers at one station.' },
   { id: 'deadVia', title: 'Dead-VIA removal', kind: 'dead-code elimination', description: 'PASS instructions only assert that a ride goes through a station; once verified they have no effect.' },
   { id: 'mergeSegments', title: 'Segment merging', kind: 'instruction combining', description: 'Consecutive rides on the same line become a single ride.' },
-  { id: 'routeOptimality', title: 'Route-optimality analysis', kind: 'global analysis (Dijkstra)', description: 'Finds the fastest route on the metro graph and suggests it — never rewrites your program.' },
+  { id: 'routeOptimality', title: 'Route-optimality analysis', kind: 'global analysis (Dijkstra)', description: 'Finds the fastest and the fewest-changes routes on the metro graph and suggests them as source — never rewrites your program.' },
 ];
 
 export type PassOptions = Record<PassId, boolean>;

@@ -111,14 +111,24 @@ export interface PathResult {
   stations: string[];
 }
 
-export type PathMetric = 'time' | 'distance';
+/**
+ * - time:      minutes, +INTERCHANGE_MIN per change (fastest route)
+ * - distance:  km (what DMRC charges by)
+ * - transfers: lexicographic (fewest changes first, then fastest) — implemented
+ *              by giving each interchange edge a cost larger than any possible ride
+ */
+export type PathMetric = 'time' | 'distance' | 'transfers';
+
+/** Bigger than the running time of any whole journey on this map, so one change always outweighs riding. */
+const TRANSFER_PENALTY = 10_000;
 
 /** Dijkstra from every line-copy of `from` to any line-copy of `to`. */
 export function shortestPath(from: string, to: string, metric: PathMetric = 'time'): PathResult | undefined {
   const dist = new Map<string, number>();
   const prev = new Map<string, string>();
   const done = new Set<string>();
-  const cost = (e: Edge) => (metric === 'time' ? e.min : e.kind === 'transfer' ? 0.001 : e.km);
+  const cost = (e: Edge) =>
+    metric === 'time' ? e.min : metric === 'transfers' ? (e.kind === 'transfer' ? TRANSFER_PENALTY + e.min : e.min) : e.kind === 'transfer' ? 0.001 : e.km;
   for (const l of linesAt.get(from) ?? []) dist.set(node(l, from), 0);
   while (true) {
     let u: string | undefined;
@@ -151,7 +161,11 @@ function buildPath(end: string, prev: Map<string, string>): PathResult {
     if (la !== lb) continue; // transfer edge
     const km = graph.get(nodes[i])!.find((e) => e.to === nodes[i + 1])!.km;
     const last = legs[legs.length - 1];
-    if (last && last.line === la && last.to === sa) {
+    // Extend the current leg only while one route still serves it. On the
+    // Green Line "Y" a path can pass Ashok Park Main from one branch to the
+    // other; no single train does that, so it becomes a new leg (a change of
+    // trains on the same line) instead of an impossible ride.
+    if (last && last.line === la && last.to === sa && routesContaining(la, last.from, sb).length) {
       last.to = sb;
       last.stops++;
       last.km = round1(last.km + km);
@@ -167,6 +181,21 @@ function buildPath(end: string, prev: Map<string, string>): PathResult {
     min: legs.reduce((n, l) => n + l.min, 0) + Math.max(0, legs.length - 1) * INTERCHANGE_MIN,
     stations,
   };
+}
+
+/**
+ * Back-translate a path into MetroCC source: the inverse of the front end.
+ * The result is a valid program that compiles to exactly this route.
+ */
+export function pathToSource(p: PathResult, depart?: string): string | undefined {
+  if (!p.legs.length) return undefined;
+  // A same-line branch change (Green Line at Ashok Park Main) has no MetroCC syntax.
+  if (p.legs.some((l, i) => i > 0 && p.legs[i - 1].line === l.line)) return undefined;
+  const q = (n: string) => (/^[A-Za-z0-9][A-Za-z0-9'. -]*$/.test(n) && !/\b(BOARD|ON|VIA|CHANGE|AT|EXIT)\b/.test(n) ? n : `"${n}"`);
+  const lines = [`BOARD ${q(p.legs[0].from)} ON ${p.legs[0].line}${depart ? ` AT ${depart}` : ''};`];
+  for (let i = 1; i < p.legs.length; i++) lines.push(`CHANGE ${p.legs[i].line} AT ${q(p.legs[i].from)};`);
+  lines.push(`EXIT ${q(p.legs[p.legs.length - 1].to)};`);
+  return lines.join('\n') + '\n';
 }
 
 /** DMRC charges by the shortest-distance path between origin and destination. */

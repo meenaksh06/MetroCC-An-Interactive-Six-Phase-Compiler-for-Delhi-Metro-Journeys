@@ -246,6 +246,30 @@ EXIT Kirti Nagar;
 EXIT Rajiv Chowk;
 `,
   },
+  {
+    id: 'opt-fewest',
+    title: 'Fastest vs fewest changes (New Delhi → ITO)',
+    group: 'Optimizer showcases',
+    expect: { codes: [] },
+    source: `// Fastest route needs 2 changes; Dijkstra also finds a 1-change route
+BOARD New Delhi ON Yellow;
+CHANGE Blue AT Rajiv Chowk;
+CHANGE Violet AT Mandi House;
+EXIT ITO;
+`,
+  },
+  {
+    id: 'green-cross-branch',
+    title: 'Ride across Green Line branches (regression)',
+    group: 'Valid journeys',
+    expect: { codes: [] },
+    source: `// Dijkstra's best route switches Green Line branches at Ashok Park Main
+BOARD Jahangirpuri ON Yellow;
+CHANGE Blue AT Rajiv Chowk;
+CHANGE Green AT Kirti Nagar;
+EXIT Satguru Ram Singh Marg;
+`,
+  },
   // ------------------------------------------------------------ departure times
   {
     id: 'depart-morning',

@@ -2,6 +2,7 @@ import { lineColor } from '../../compiler/data/graph';
 import { metrics, type IRMetrics } from '../../compiler/ir/irgen';
 import { PASSES } from '../../compiler/optimizer/optimizer';
 import type { OptimalitySuggestion } from '../../compiler/optimizer/passes/routeOptimality';
+import type { PathResult } from '../../compiler/data/graph';
 import { useStore } from '../store';
 import { IRLine } from './IRView';
 
@@ -128,6 +129,7 @@ function Metrics({ before, after }: { before: IRMetrics; after: IRMetrics }) {
 }
 
 function Suggestion({ sug }: { sug: OptimalitySuggestion }) {
+  const { setSource } = useStore();
   const Legs = ({ legs }: { legs: { line: string; from: string; to: string; stops: number }[] }) => (
     <div className="flex flex-wrap items-center gap-1">
       {legs.map((l, i) => (
@@ -141,6 +143,12 @@ function Suggestion({ sug }: { sug: OptimalitySuggestion }) {
       ))}
     </div>
   );
+  const sameRoute = (a: PathResult, b: PathResult) => a.legs.map((l) => `${l.line}:${l.from}`).join() === b.legs.map((l) => `${l.line}:${l.from}`).join();
+  const alternatives: { key: string; title: string; path: PathResult; source?: string; note: string }[] = [
+    { key: 'fastest', title: 'Fastest', path: sug.optimal, source: sug.sources.fastest, note: 'Dijkstra on minutes (+5 min per interchange)' },
+    { key: 'fewest', title: 'Fewest changes', path: sug.fewestChanges, source: sug.sources.fewestChanges, note: 'Dijkstra with a large cost per interchange, ties broken by time' },
+  ];
+  const showFewest = !sameRoute(sug.optimal, sug.fewestChanges);
   return (
     <div className={`card border-2 ${sug.better ? 'border-amber-400/60' : 'border-emerald-500/50'}`}>
       <div className="card-title">🧭 Route-optimality (Dijkstra) {sug.better ? '— suggestion' : '— optimal ✓'}</div>
@@ -164,7 +172,33 @@ function Suggestion({ sug }: { sug: OptimalitySuggestion }) {
           </p>
         </div>
       </div>
+      <div className="border-t p-3 text-sm" style={{ borderColor: 'var(--border)' }}>
+        <div className="mb-2 text-xs font-semibold uppercase muted">Alternatives (emitted as MetroCC source)</div>
+        <div className="space-y-2">
+          {alternatives
+            .filter((a) => a.key === 'fastest' || showFewest)
+            .map((a) => (
+              <div key={a.key} className="rounded-lg p-2" style={{ background: 'var(--panel-2)' }}>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold">{a.title}</span>
+                  <span className="mono text-xs">{a.path.min} min · {a.path.interchanges} change(s) · {a.path.stops} stops</span>
+                  {a.source && (
+                    <button className="btn ml-auto px-2 py-0.5 text-xs" onClick={() => setSource(a.source!)} title="Replace the editor contents with this program">
+                      Load into editor
+                    </button>
+                  )}
+                </div>
+                <div className="mt-1 text-[11px] muted">{a.note}</div>
+                {a.source ? (
+                  <pre className="mono mt-1 overflow-auto rounded p-2 text-[11px]" style={{ background: 'var(--panel)' }}>{a.source}</pre>
+                ) : (
+                  <div className="mt-1 text-[11px] muted">This route changes Green Line branches at Ashok Park Main, which the language cannot express yet.</div>
+                )}
+              </div>
+            ))}
+          {!showFewest && <p className="text-xs muted">The fastest route already has the fewest interchanges.</p>}
+        </div>
+      </div>
     </div>
   );
 }
-
