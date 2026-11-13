@@ -44,13 +44,22 @@ interface StackEntry {
 }
 
 const tokenDesc = (t: Token) =>
-  t.type === 'EOF' ? 'end of input' : t.type === 'NAME' ? `name '${t.value}'` : t.type === 'SEMI' ? "';'" : `keyword ${t.type}`;
+  t.type === 'EOF'
+    ? 'end of input'
+    : t.type === 'NAME'
+      ? `name '${t.value}'`
+      : t.type === 'TIME'
+        ? `time ${t.value}`
+        : t.type === 'SEMI'
+          ? "';'"
+          : `keyword ${t.type}`;
 
 const ROLE_OF: Record<string, string> = {};
 for (const p of PRODUCTIONS) for (const [i, r] of Object.entries(p.roles ?? {})) ROLE_OF[`${p.id}:${i}`] = r;
 
 const STMT_NAME: Partial<Record<NonTerminal, string>> = {
   board_stmt: 'BOARD',
+  depart: 'BOARD',
   via_stmt: 'VIA',
   change_stmt: 'CHANGE',
   exit_stmt: 'EXIT',
@@ -130,8 +139,9 @@ export function parse(tokens: Token[]): PhaseResult<ParseOutput, ParseStep> {
         const node = top.node!;
         node.span = tok.span;
         node.attrs = { ...(node.attrs ?? {}), lexeme: tok.value };
-        node.label = a === 'NAME' ? `NAME “${tok.value}”` : displaySym(a);
-        record({ kind: 'match', action: `Match ${displaySym(a)}${a === 'NAME' ? ` “${tok.value}”` : ''} — pop and advance`, tokenIndex: ip, nodeIds: [node.id] });
+        const valued = a === 'NAME' || a === 'TIME';
+        node.label = valued ? `${a} “${tok.value}”` : displaySym(a);
+        record({ kind: 'match', action: `Match ${displaySym(a)}${valued ? ` “${tok.value}”` : ''} — pop and advance`, tokenIndex: ip, nodeIds: [node.id] });
         stack.pop();
         ip++;
         suppress = false;
@@ -175,6 +185,13 @@ export function parse(tokens: Token[]): PhaseResult<ParseOutput, ParseStep> {
               : expected === 'ON'
                 ? 'Form: BOARD <station> ON <line>;'
                 : 'Form: CHANGE <line> AT <station>;'),
+        );
+      } else if (expected === 'TIME') {
+        reported = report(
+          'P13',
+          `Expected a departure time after AT in the BOARD statement, found ${tokenDesc(tok)}.`,
+          a === '$' || a === 'SEMI' ? spanAfter(prevSpan()) : tok.span,
+          'Write the time as HH:MM, e.g. BOARD Rajiv Chowk ON Yellow AT 08:30;',
         );
       } else if (expected === 'NAME') {
         const what = role === 'line' ? 'a line name' : 'a station name';
@@ -228,6 +245,12 @@ export function parse(tokens: Token[]): PhaseResult<ParseOutput, ParseStep> {
     }
 
     const prods = PRODUCTIONS.filter((p) => p.lhs === A);
+    if (A === 'depart') {
+      // The departure time is optional: take the ε-production and let the next
+      // terminal (';') report the precise problem, e.g. a missing semicolon.
+      expand(top, prods.find((p) => !p.rhs.length)!, ' (no departure time — error will be reported at the terminal)');
+      continue;
+    }
     if (prods.length === 1) {
       // Only one way forward: expand and let the terminal mismatch report the precise problem.
       expand(top, prods[0], ' (only production — error will be reported at the terminal)');

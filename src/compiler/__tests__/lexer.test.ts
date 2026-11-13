@@ -9,7 +9,7 @@ const values = (src: string) => lex(src).result.tokens.map((t) => t.value);
 describe('DFA', () => {
   it('is deterministic: at most one transition per (state, class)', () => {
     for (const s of DFA_STATES)
-      for (const c of ['letter', 'digit', 'wpunct', 'space', 'newline', 'semi', 'slash', 'quote', 'star', 'other'] as const)
+      for (const c of ['letter', 'digit', 'wpunct', 'space', 'newline', 'semi', 'slash', 'quote', 'star', 'colon', 'other'] as const)
         expect(DFA_TRANSITIONS.filter((t) => t.from === s.id && t.on.includes(c)).length).toBeLessThanOrEqual(1);
   });
   it('classifies characters', () => {

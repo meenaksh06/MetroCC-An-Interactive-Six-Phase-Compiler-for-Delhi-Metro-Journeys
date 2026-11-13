@@ -13,8 +13,8 @@ export const THEORY: Record<PhaseId, { heading: string; points: string[] }> = {
   lexer: {
     heading: 'Regular languages → DFA',
     points: [
-      'Each token class is a regular expression, e.g. WORD = [A-Za-z0-9][A-Za-z0-9\'.-]*, SEMI = ;, COMMENT = //[^\\n]*. Their union is recognised by one DFA (Thompson NFA → subset construction → minimisation).',
-      'The scanner applies maximal munch: it follows δ(q, c) until there is no move, then emits the token of the accepting state it stopped in and restarts at q0. Halting in a non-accepting state (q4 after "/", q6 inside a quote) is a lexical error.',
+      'Each token class is a regular expression, e.g. WORD = [A-Za-z0-9][A-Za-z0-9\'.-]*, TIME = [0-9]+:[0-9]+, SEMI = ;, COMMENT = //[^\\n]*. Their union is recognised by one DFA (Thompson NFA → subset construction → minimisation).',
+      'The scanner applies maximal munch: it follows δ(q, c) until there is no move, then emits the token of the accepting state it stopped in and restarts at q0. Halting in a non-accepting state (q4 after "/", q6 inside a quote, q9 after "08:") is a lexical error.',
       'Multi-word station names use a scanner + screener design (Dragon Book §3.4.3): the DFA emits WORDs, then the screener marks reserved keywords and merges adjacent non-keyword words on one line into a NAME. The lexer never reads the station table, so lexing stays purely regular; "is this a real station?" is a semantic question with a symbol table and "did you mean" hints.',
       'Errors are recovered in panic mode (skip the bad character and continue), so one run reports every lexical error.',
     ],
@@ -58,7 +58,7 @@ export const THEORY: Record<PhaseId, { heading: string; points: string[] }> = {
     heading: 'Instruction selection → target "machine"',
     points: [
       'The target language is human instructions plus an animation path. Each IR opcode has a template (BOARD → "Board the … at … towards …"), which is instruction selection in its simplest form.',
-      'Target-specific information is added here: platform direction ("towards" a terminus) from the station order, travel time, distance, and the DMRC fare. DMRC charges by the shortest-distance path, so a detour costs time but not money.',
+      'Target-specific information is added here: platform direction ("towards" a terminus) from the station order, travel time, distance, and the DMRC fare. With a departure time, a running clock is threaded through the IR so every step gets an estimated clock time. DMRC charges by the shortest-distance path, so a detour costs time but not money.',
       'The map shows the generated "program" being executed: the train marker runs the itinerary step by step.',
     ],
   },

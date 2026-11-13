@@ -9,7 +9,7 @@ MetroCC is an interactive web app that compiles a small domain-specific language
 | 3 | Semantic analysis | Pass/fail checklist per statement, annotated (attributed) tree, symbol table |
 | 4 | Intermediate code | Numbered three-address IR, basic blocks / control-flow graph |
 | 5 | Optimization | Toggleable passes, before/after IR diff, metrics, Dijkstra route suggestion |
-| 6 | Code generation | Human-readable itinerary, animated schematic metro map |
+| 6 | Code generation | Human-readable itinerary with an optional clock schedule, animated schematic metro map |
 
 The compiler is pure TypeScript in [src/compiler/](src/compiler/). It has no backend and uses no parser generator: the lexer and parser are hand-written. Every phase is a pure function that returns `{ ok, result, steps, diagnostics }`; the UI animates the `steps`.
 
@@ -22,7 +22,7 @@ Requirements: Node 18+ (tested on Node 22).
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # 104 unit tests (vitest)
+npm test           # 124 unit tests (vitest)
 npm run build      # type-check + production build into dist/
 ```
 
@@ -55,18 +55,27 @@ VIA Mandi House;
 EXIT Central Secretariat;
 ```
 
+An optional departure time on the BOARD statement turns the itinerary into a clock schedule:
+
+```
+BOARD Jahangirpuri ON Yellow AT 08:30;
+CHANGE Violet AT Kashmere Gate;
+EXIT Mandi House;
+```
+
 ### Tokens
 
 | Token | Definition |
 |---|---|
 | `BOARD` `ON` `VIA` `CHANGE` `AT` `EXIT` | Reserved, upper-case, case-sensitive keywords |
 | `NAME` | One or more words joined by spaces/tabs on one line, e.g. `Kashmere Gate`, `Sector 18`; or a double-quoted string such as `"Dilli Haat - INA"` |
+| `TIME` | `[0-9]+ : [0-9]+`, a departure time such as `08:30` (the screener pads the hour: `8:05` → `08:05`) |
 | `SEMI` | `;` |
 | `EOF` | End of input (`$`) |
 | *(skipped)* | Whitespace and `//` comments to end of line |
 
 **How multi-word names are handled: scanner + screener (Dragon Book §3.4.3).**
-1. The DFA in [dfa.ts](src/compiler/lexer/dfa.ts) recognises `WORD = [A-Za-z0-9][A-Za-z0-9'.-]*` with maximal munch.
+1. The DFA in [dfa.ts](src/compiler/lexer/dfa.ts) recognises `WORD = [A-Za-z0-9][A-Za-z0-9'.-]*` and `TIME = [0-9]+:[0-9]+` with maximal munch. A leading digit goes to state q8 (digits only, still accepting WORD so `Sector 18` works); a `:` there moves to q9 and then to q10 (TIME).
 2. A screener then marks reserved keywords and merges adjacent non-keyword words on the same line into a single `NAME`.
 
 Why this design:
@@ -79,7 +88,8 @@ Why this design:
 
 ```
 <program>     ::= <board_stmt> <route_list> <exit_stmt>
-<board_stmt>  ::= BOARD <station> ON <line> ";"
+<board_stmt>  ::= BOARD <station> ON <line> <depart> ";"
+<depart>      ::= AT TIME | ε
 <route_list>  ::= <route_stmt> <route_list> | ε
 <route_stmt>  ::= <via_stmt> | <change_stmt>
 <via_stmt>    ::= VIA <station> ";"
@@ -92,18 +102,22 @@ Why this design:
 - `route_stmt*` is rewritten as the right-recursive `route_list` with an ε-production. Left recursion would break top-down parsing.
 - No left-factoring is needed, because every alternative starts with a different keyword.
 - "BOARD first, EXIT last, exactly once" is enforced by the grammar itself.
+- The optional departure time is the ε-production `depart → ε`. It is numbered 10/11 so the original productions 1–9 keep their numbers.
 
 | Non-terminal | FIRST | FOLLOW |
 |---|---|---|
 | program | { BOARD } | { $ } |
 | board_stmt | { BOARD } | { VIA, CHANGE, EXIT } |
+| depart | { AT, ε } | { ; } |
 | route_list | { VIA, CHANGE, ε } | { EXIT } |
 | route_stmt | { VIA, CHANGE } | { VIA, CHANGE, EXIT } |
 | via_stmt | { VIA } | { VIA, CHANGE, EXIT } |
 | change_stmt | { CHANGE } | { VIA, CHANGE, EXIT } |
 | exit_stmt | { EXIT } | { $ } |
 
-**LL(1) check:** FIRST(route_stmt route_list) ∩ FOLLOW(route_list) = {VIA, CHANGE} ∩ {EXIT} = ∅.
+**LL(1) checks:**
+- FIRST(route_stmt route_list) ∩ FOLLOW(route_list) = {VIA, CHANGE} ∩ {EXIT} = ∅.
+- FIRST(AT TIME) ∩ FOLLOW(depart) = {AT} ∩ {;} = ∅.
 
 The sets and the table are computed in code ([firstFollow.ts](src/compiler/parser/firstFollow.ts), [ll1Table.ts](src/compiler/parser/ll1Table.ts)). A unit test asserts the table has zero conflicts.
 
@@ -131,6 +145,7 @@ Each phase reports *all* of its errors (capped at 25 per phase), and the pipelin
 | L03 | Empty quoted name `""` |
 | L04 | Lone `/` (comments are `//`) |
 | L05 | Block comment `/* */` or stray `*/` |
+| L06 | Incomplete time such as `08:` (no minutes after the colon) |
 
 Lexical warnings:
 
@@ -157,6 +172,7 @@ Lexical warnings:
 | P10 | Duplicate EXIT |
 | P11 | Keyword where a name was expected |
 | P12 | Unexpected token / name split across lines / statement without keyword |
+| P13 | `AT` in a BOARD statement without a departure time |
 
 **Semantic (S)**
 
@@ -175,6 +191,7 @@ Lexical warnings:
 | S11 | Direction reversal |
 | S12 | Stations on different branches of the Green Line |
 | S13 | Zero-length journey |
+| S14 | Departure time is not a valid 24-hour time (`25:10`, `08:75`) |
 
 Semantic warnings and notes:
 
@@ -185,7 +202,14 @@ Semantic warnings and notes:
 | W-S22 | Change and immediately change back |
 | W-S23 | Change at the boarding station |
 | W-S24 | Two transfers in a row at one station |
+| W-S25 | Departure outside the modelled service hours (≈ 05:30–23:30) |
 | I-S30 | Alias / former name resolved (e.g. Race Course → Lok Kalyan Marg) |
+
+**Code generation (C)**
+
+| Code | Meaning |
+|---|---|
+| W-C01 | With a departure time, the journey would arrive after the last trains (≈ 23:30) |
 
 ---
 
@@ -213,6 +237,7 @@ Semantic warnings and notes:
 - Each hop takes about 1.5 min per km plus 0.6 min dwell, rounded.
 - Each interchange adds 5 min.
 - The fare follows DMRC practice and is charged on the shortest-distance path.
+- With `AT HH:MM`, code generation runs a clock through the IR: each RIDE adds its running time, each TRANSFER adds 5 min. Every itinerary step gets a time, and arrival = departure + total time. These are estimates from the model, not a timetable.
 
 The graph ([graph.ts](src/compiler/data/graph.ts)) has one node per line-copy of a station. Edges join adjacent stations on a line, and interchange edges join the copies of the same station. Dijkstra runs over this graph.
 

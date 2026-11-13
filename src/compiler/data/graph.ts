@@ -4,9 +4,12 @@
  * stations on a route and the copies of the same station (interchange edges).
  */
 import type { LineId } from '../types';
-import { FARE_SLABS, INTERCHANGE_MIN, LINES, STATIONS, fareFor, hopMinutes, type LineDef, type Route, type StationDef } from './metro';
+import {
+  FARE_SLABS, INTERCHANGE_MIN, LINES, SERVICE_END_MIN, SERVICE_START_MIN, STATIONS, fareFor, formatClock, hopMinutes, parseClock,
+  type LineDef, type Route, type StationDef,
+} from './metro';
 
-export { FARE_SLABS, INTERCHANGE_MIN, fareFor, hopMinutes };
+export { FARE_SLABS, INTERCHANGE_MIN, SERVICE_END_MIN, SERVICE_START_MIN, fareFor, formatClock, hopMinutes, parseClock };
 
 export const LINE_IDS = LINES.map((l) => l.id);
 export const lineById = new Map<string, LineDef>(LINES.map((l) => [l.id, l]));

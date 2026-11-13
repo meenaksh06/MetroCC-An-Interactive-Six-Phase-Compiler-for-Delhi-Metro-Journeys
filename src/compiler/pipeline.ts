@@ -36,5 +36,6 @@ export function compile(src: string, passes: PassOptions = ALL_PASSES): CompileR
   res.ir = generateIR(res.semantic.result.journey);
   res.optimizer = optimize(res.ir.result.ir, passes);
   res.codegen = generate(res.optimizer.result.after);
+  collect(res.codegen); // warnings only (e.g. W-C01 arrival after the last train)
   return res;
 }

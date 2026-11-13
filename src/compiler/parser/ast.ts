@@ -5,7 +5,11 @@ const nameAt = (n: TreeNode, i: number): NameRef => ({ name: n.children[i].attrs
 
 export function buildAst(root: TreeNode): Program {
   const [boardN, listN, exitN] = root.children;
-  const board: BoardStmt = { kind: 'board', station: nameAt(boardN, 1), line: nameAt(boardN, 3), span: boardN.span! };
+  const departN = boardN.children[4];
+  const board: BoardStmt = {
+    kind: 'board', station: nameAt(boardN, 1), line: nameAt(boardN, 3), span: boardN.span!,
+    ...(departN.children.length === 2 ? { depart: nameAt(departN, 1) } : {}),
+  };
   const routes: RouteStmt[] = [];
   let list = listN;
   while (list.children.length === 2) {
@@ -26,7 +30,11 @@ export function astToTree(p: Program): TreeNode {
   const stmts = [p.board, ...p.routes, p.exit].map((s) => {
     switch (s.kind) {
       case 'board':
-        return node('Board', s.span, [leaf(`station: ${s.station.name}`, s.station.span), leaf(`line: ${s.line.name}`, s.line.span)]);
+        return node('Board', s.span, [
+          leaf(`station: ${s.station.name}`, s.station.span),
+          leaf(`line: ${s.line.name}`, s.line.span),
+          ...(s.depart ? [leaf(`depart: ${s.depart.name}`, s.depart.span)] : []),
+        ]);
       case 'via':
         return node('Via', s.span, [leaf(`station: ${s.station.name}`, s.station.span)]);
       case 'change':

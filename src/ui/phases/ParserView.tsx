@@ -69,7 +69,7 @@ export function ParserView() {
   );
 }
 
-const tokShort = (t: Token) => (t.type === 'EOF' ? '$' : t.type === 'NAME' ? `“${t.value.length > 14 ? t.value.slice(0, 13) + '…' : t.value}”` : displaySym(t.type));
+const tokShort = (t: Token) => (t.type === 'EOF' ? '$' : t.type === 'NAME' ? `“${t.value.length > 14 ? t.value.slice(0, 13) + '…' : t.value}”` : t.type === 'TIME' ? t.value : displaySym(t.type));
 
 function Trace({ tokens }: { tokens: Token[] }) {
   const { result, step, setStep, setHover, editorHover } = useStore();
@@ -178,7 +178,7 @@ function GrammarView() {
       <div>
         <div className="mb-1 text-xs font-semibold uppercase tracking-wider muted">Context-free grammar (BNF)</div>
         <pre className="mono overflow-x-auto rounded-lg p-3 text-[12.5px] leading-relaxed" style={{ background: 'var(--panel-2)' }}>{BNF}</pre>
-        <p className="muted mt-1 text-xs">Terminals: BOARD ON VIA CHANGE AT EXIT NAME ";" $. &lt;station&gt; and &lt;line&gt; are roles of NAME; they are told apart in semantic analysis.</p>
+        <p className="muted mt-1 text-xs">Terminals: BOARD ON VIA CHANGE AT EXIT NAME TIME ";" $. &lt;station&gt; and &lt;line&gt; are roles of NAME; they are told apart in semantic analysis.</p>
       </div>
       <table className="tbl">
         <thead>

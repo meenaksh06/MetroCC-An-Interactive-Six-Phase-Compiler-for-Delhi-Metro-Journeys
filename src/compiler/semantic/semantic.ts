@@ -10,7 +10,7 @@
  * are marked "skipped" instead of producing follow-on errors.
  */
 import { DiagnosticSink } from '../diagnostics';
-import { lineById, linesAt, rideInfo, routesContaining } from '../data/graph';
+import { SERVICE_END_MIN, SERVICE_START_MIN, formatClock, lineById, linesAt, parseClock, rideInfo, routesContaining } from '../data/graph';
 import type { LineId, PhaseResult, Program, Span, Stmt, TreeNode } from '../types';
 import { SymbolTable, type Resolution, type SymbolEntry } from './symbolTable';
 
@@ -48,6 +48,8 @@ export interface Journey {
   stmts: Stmt[];
   /** canonical names per statement (aliases resolved) */
   resolved: { station: string; line?: LineId }[];
+  /** departure time in minutes after midnight, if the BOARD statement gives one */
+  depart?: number;
 }
 
 export interface SemanticOutput {
@@ -98,6 +100,7 @@ export function analyse(program: Program): PhaseResult<SemanticOutput, SemanticS
   const visited = new Map<string, number>(); // station → stmt where first passed
   let loopWarned = false;
   let boardWp: (Waypoint & { line: LineId }) | null = null;
+  let depart: number | undefined;
   const resolvedNames: { station: string; line?: LineId }[] = [];
 
   const resolveS = (stmt: number, s: Stmt, ref: { name: string; span: Span }): string | null => {
@@ -246,10 +249,26 @@ export function analyse(program: Program): PhaseResult<SemanticOutput, SemanticS
         segPoints = pos ? [{ station: pos, stmt: i, kind: 'board', span: s.span }] : [];
         if (pos) visited.set(pos, 0);
         if (l && st) boardWp = { station: st, stmt: 0, kind: 'board', span: s.span, line: l };
+        if (s.depart) {
+          const t = parseClock(s.depart.name);
+          if (t === undefined)
+            check(i, `Departure time ${s.depart.name} is a valid 24-hour time`, 'fail', s.depart.span, 'S14',
+              `“${s.depart.name}” is not a valid time of day.`, 'Use 24-hour HH:MM with hours 00–23 and minutes 00–59, e.g. 08:30 or 18:05.');
+          else {
+            check(i, `Departure time ${s.depart.name} is a valid 24-hour time`, 'pass', s.depart.span);
+            if (t < SERVICE_START_MIN || t > SERVICE_END_MIN)
+              check(i, 'Departure is within service hours', 'warn', s.depart.span, 'W-S25',
+                `Metro services run roughly ${formatClock(SERVICE_START_MIN)}–${formatClock(SERVICE_END_MIN)}; there may be no train at ${formatClock(t)}.`,
+                'Check the first/last train times for your station.');
+            else check(i, 'Departure is within service hours', 'pass', s.depart.span);
+            depart = t;
+          }
+        }
         resolvedNames[i] = { station: st ?? '', line: l ?? undefined };
         children.push(tnode(`station: ${s.station.name}`, s.station.span, st ? { type: 'station', lines: (linesAt.get(st) ?? []).join(', ') } : { type: 'error' }, [], 'leaf'));
         children.push(tnode(`line: ${s.line.name}`, s.line.span, l ? { type: 'line', color: lineById.get(l)!.color } : { type: 'error' }, [], 'leaf'));
-        syn = { 'line.out': line ?? '?', 'pos.out': pos ?? '?' };
+        if (s.depart) children.push(tnode(`depart: ${s.depart.name}`, s.depart.span, depart !== undefined ? { type: 'time', minutes: String(depart) } : { type: 'error' }, [], 'leaf'));
+        syn = { 'line.out': line ?? '?', 'pos.out': pos ?? '?', ...(depart !== undefined ? { 'clock.out': formatClock(depart) } : {}) };
         break;
       }
       case 'via': {
@@ -333,7 +352,7 @@ export function analyse(program: Program): PhaseResult<SemanticOutput, SemanticS
   const bw = boardWp as (Waypoint & { line: LineId }) | null; // assigned inside the forEach closure
   const journey: Journey | null =
     ok && bw
-      ? { board: bw, segments, exit: { station: resolvedNames[stmts.length - 1].station, stmt: stmts.length - 1, kind: 'exit', span: program.exit.span }, stmts, resolved: resolvedNames }
+      ? { board: bw, segments, exit: { station: resolvedNames[stmts.length - 1].station, stmt: stmts.length - 1, kind: 'exit', span: program.exit.span }, stmts, resolved: resolvedNames, depart }
       : null;
 
   // put the structural checks in statement order for the checklist

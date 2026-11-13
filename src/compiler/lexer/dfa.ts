@@ -3,6 +3,7 @@
  * the SVG diagram in the UI, so what is drawn is exactly what runs.
  *
  *   WORD    = [A-Za-z0-9] [A-Za-z0-9'.-]*
+ *   TIME    = [0-9]+ : [0-9]+     (departure time, e.g. 08:30)
  *   WS      = [ \t\r]+ | \n  (any mix)
  *   SEMI    = ;
  *   COMMENT = // [^\n]*
@@ -19,6 +20,7 @@ export type CharClass =
   | 'slash'
   | 'quote'
   | 'star'
+  | 'colon'
   | 'other';
 
 export const CHAR_CLASS_LABEL: Record<CharClass, string> = {
@@ -31,16 +33,17 @@ export const CHAR_CLASS_LABEL: Record<CharClass, string> = {
   slash: '/',
   quote: '"',
   star: '*',
+  colon: ':',
   other: 'other',
 };
 
-export type StateId = 'q0' | 'q_word' | 'q_ws' | 'q_semi' | 'q_slash' | 'q_comment' | 'q_quote' | 'q_qend';
+export type StateId = 'q0' | 'q_word' | 'q_ws' | 'q_semi' | 'q_slash' | 'q_comment' | 'q_quote' | 'q_qend' | 'q_num' | 'q_colon' | 'q_time';
 
 export interface DfaState {
   id: StateId;
   label: string;
   /** Token kind produced when the DFA halts in this state (undefined = non-accepting). */
-  accepts?: 'WORD' | 'WS' | 'SEMI' | 'COMMENT' | 'QUOTED';
+  accepts?: 'WORD' | 'WS' | 'SEMI' | 'COMMENT' | 'QUOTED' | 'TIME';
   x: number;
   y: number;
   /** which side the self-loop is drawn on */
@@ -57,6 +60,9 @@ export const DFA_STATES: DfaState[] = [
   { id: 'q_comment', label: 'q5', accepts: 'COMMENT', x: 400, y: 400, loop: 'down', description: 'Inside a // comment until end of line.' },
   { id: 'q_quote', label: 'q6', x: 470, y: 215, loop: 'up', description: 'Inside a "quoted name".' },
   { id: 'q_qend', label: 'q7', accepts: 'QUOTED', x: 630, y: 120, description: 'Closing quote seen.' },
+  { id: 'q_num', label: 'q8', accepts: 'WORD', x: 150, y: -20, loop: 'up', description: 'Digits only so far: a number inside a name (Sector 18) or the hours of a time.' },
+  { id: 'q_colon', label: 'q9', x: 330, y: -20, description: 'Saw "HH:": minutes must follow.' },
+  { id: 'q_time', label: 'q10', accepts: 'TIME', x: 510, y: -20, loop: 'up', description: 'A departure time such as 08:30.' },
 ];
 
 export interface DfaTransition {
@@ -66,11 +72,17 @@ export interface DfaTransition {
   label: string;
 }
 
-const ALL: CharClass[] = ['letter', 'digit', 'wpunct', 'space', 'newline', 'semi', 'slash', 'quote', 'star', 'other'];
+const ALL: CharClass[] = ['letter', 'digit', 'wpunct', 'space', 'newline', 'semi', 'slash', 'quote', 'star', 'colon', 'other'];
 const except = (...xs: CharClass[]) => ALL.filter((c) => !xs.includes(c));
 
 export const DFA_TRANSITIONS: DfaTransition[] = [
-  { from: 'q0', to: 'q_word', on: ['letter', 'digit'], label: '[A-Za-z0-9]' },
+  { from: 'q0', to: 'q_word', on: ['letter'], label: '[A-Za-z]' },
+  { from: 'q0', to: 'q_num', on: ['digit'], label: '[0-9]' },
+  { from: 'q_num', to: 'q_num', on: ['digit'], label: '[0-9]' },
+  { from: 'q_num', to: 'q_word', on: ['letter', 'wpunct'], label: "[A-Za-z'.-]" },
+  { from: 'q_num', to: 'q_colon', on: ['colon'], label: ':' },
+  { from: 'q_colon', to: 'q_time', on: ['digit'], label: '[0-9]' },
+  { from: 'q_time', to: 'q_time', on: ['digit'], label: '[0-9]' },
   { from: 'q_word', to: 'q_word', on: ['letter', 'digit', 'wpunct'], label: "[A-Za-z0-9'.-]" },
   { from: 'q0', to: 'q_ws', on: ['space', 'newline'], label: 'ws' },
   { from: 'q_ws', to: 'q_ws', on: ['space', 'newline'], label: 'ws' },
@@ -95,6 +107,7 @@ export function classify(ch: string): CharClass {
   if (ch === '/') return 'slash';
   if (ch === '"') return 'quote';
   if (ch === '*') return 'star';
+  if (ch === ':') return 'colon';
   return 'other';
 }
 

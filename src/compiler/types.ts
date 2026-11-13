@@ -37,7 +37,7 @@ export interface PhaseResult<R, S> {
 // ---------------------------------------------------------------- tokens
 
 export type KeywordType = 'BOARD' | 'ON' | 'VIA' | 'CHANGE' | 'AT' | 'EXIT';
-export type TokenType = KeywordType | 'NAME' | 'SEMI' | 'EOF';
+export type TokenType = KeywordType | 'NAME' | 'TIME' | 'SEMI' | 'EOF';
 export type TriviaType = 'WS' | 'COMMENT' | 'ERROR';
 
 export interface Token {
@@ -81,6 +81,8 @@ export interface BoardStmt {
   kind: 'board';
   station: NameRef;
   line: NameRef;
+  /** optional departure time: BOARD … ON … AT 08:30; */
+  depart?: NameRef;
   span: Span;
 }
 export interface ViaStmt {

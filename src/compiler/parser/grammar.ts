@@ -2,7 +2,8 @@
  * The MetroCC context-free grammar (LL(1) form).
  *
  *   program     → board_stmt route_list exit_stmt
- *   board_stmt  → BOARD NAME ON NAME ;
+ *   board_stmt  → BOARD NAME ON NAME depart ;
+ *   depart      → AT TIME | ε                    (optional departure time)
  *   route_list  → route_stmt route_list | ε        (EBNF route_stmt* made right-recursive)
  *   route_stmt  → via_stmt | change_stmt
  *   via_stmt    → VIA NAME ;
@@ -10,8 +11,8 @@
  *   exit_stmt   → EXIT NAME ;
  */
 
-export type Terminal = 'BOARD' | 'ON' | 'VIA' | 'CHANGE' | 'AT' | 'EXIT' | 'NAME' | 'SEMI' | '$';
-export type NonTerminal = 'program' | 'board_stmt' | 'route_list' | 'route_stmt' | 'via_stmt' | 'change_stmt' | 'exit_stmt';
+export type Terminal = 'BOARD' | 'ON' | 'VIA' | 'CHANGE' | 'AT' | 'EXIT' | 'NAME' | 'TIME' | 'SEMI' | '$';
+export type NonTerminal = 'program' | 'board_stmt' | 'depart' | 'route_list' | 'route_stmt' | 'via_stmt' | 'change_stmt' | 'exit_stmt';
 export type GSymbol = Terminal | NonTerminal;
 
 export const EPSILON = 'ε';
@@ -26,12 +27,12 @@ export interface Production {
 
 export const START: NonTerminal = 'program';
 
-export const TERMINALS: Terminal[] = ['BOARD', 'ON', 'VIA', 'CHANGE', 'AT', 'EXIT', 'NAME', 'SEMI', '$'];
-export const NONTERMINALS: NonTerminal[] = ['program', 'board_stmt', 'route_list', 'route_stmt', 'via_stmt', 'change_stmt', 'exit_stmt'];
+export const TERMINALS: Terminal[] = ['BOARD', 'ON', 'VIA', 'CHANGE', 'AT', 'EXIT', 'NAME', 'TIME', 'SEMI', '$'];
+export const NONTERMINALS: NonTerminal[] = ['program', 'board_stmt', 'depart', 'route_list', 'route_stmt', 'via_stmt', 'change_stmt', 'exit_stmt'];
 
 export const PRODUCTIONS: Production[] = [
   { id: 1, lhs: 'program', rhs: ['board_stmt', 'route_list', 'exit_stmt'] },
-  { id: 2, lhs: 'board_stmt', rhs: ['BOARD', 'NAME', 'ON', 'NAME', 'SEMI'], roles: { 1: 'station', 3: 'line' } },
+  { id: 2, lhs: 'board_stmt', rhs: ['BOARD', 'NAME', 'ON', 'NAME', 'depart', 'SEMI'], roles: { 1: 'station', 3: 'line' } },
   { id: 3, lhs: 'route_list', rhs: ['route_stmt', 'route_list'] },
   { id: 4, lhs: 'route_list', rhs: [] },
   { id: 5, lhs: 'route_stmt', rhs: ['via_stmt'] },
@@ -39,6 +40,9 @@ export const PRODUCTIONS: Production[] = [
   { id: 7, lhs: 'via_stmt', rhs: ['VIA', 'NAME', 'SEMI'], roles: { 1: 'station' } },
   { id: 8, lhs: 'change_stmt', rhs: ['CHANGE', 'NAME', 'AT', 'NAME', 'SEMI'], roles: { 1: 'line', 3: 'station' } },
   { id: 9, lhs: 'exit_stmt', rhs: ['EXIT', 'NAME', 'SEMI'], roles: { 1: 'station' } },
+  // added after the original nine so existing production numbers stay stable
+  { id: 10, lhs: 'depart', rhs: ['AT', 'TIME'] },
+  { id: 11, lhs: 'depart', rhs: [] },
 ];
 
 export const isTerminal = (s: string): s is Terminal => (TERMINALS as string[]).includes(s);
@@ -51,7 +55,8 @@ export const productionText = (p: Production) =>
 
 /** BNF shown in the UI. */
 export const BNF = `<program>     ::= <board_stmt> <route_list> <exit_stmt>
-<board_stmt>  ::= BOARD <station> ON <line> ";"
+<board_stmt>  ::= BOARD <station> ON <line> <depart> ";"
+<depart>      ::= AT TIME | ε
 <route_list>  ::= <route_stmt> <route_list> | ε
 <route_stmt>  ::= <via_stmt> | <change_stmt>
 <via_stmt>    ::= VIA <station> ";"

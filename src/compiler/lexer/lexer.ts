@@ -2,7 +2,7 @@
  * Phase 1 — Lexical analysis.
  *
  * Scanner: runs the DFA in dfa.ts with maximal munch, producing raw tokens
- *   (WORD, WS, SEMI, COMMENT, QUOTED).
+ *   (WORD, TIME, WS, SEMI, COMMENT, QUOTED).
  * Screener: classifies WORDs as reserved keywords, then coalesces runs of
  *   non-keyword words on the same line into a single NAME token
  *   ("Kashmere" "Gate" → NAME "Kashmere Gate").
@@ -141,6 +141,12 @@ export function lex(src: string): PhaseResult<LexOutput, LexStep> {
       continue;
     }
 
+    if (state === 'q_colon') {
+      diags.error('L06', `Incomplete time "${src.slice(start, i)}" — minutes must follow the ':'.`, span(start, i), 'Write departure times as HH:MM, e.g. AT 08:30.');
+      errorStep('q9 is not accepting and has no move — incomplete time skipped.', i);
+      continue;
+    }
+
     if (state === 'q_quote') {
       const content = src.slice(start + 1, i);
       diags.error(
@@ -200,6 +206,12 @@ export function lex(src: string): PhaseResult<LexOutput, LexStep> {
         flush();
         const inner = r.lexeme.endsWith('"') && r.lexeme.length > 1 ? r.lexeme.slice(1, -1) : r.lexeme.slice(1);
         tokens.push({ index: tokens.length, type: 'NAME', lexeme: r.lexeme, value: inner.trim().replace(/\s+/g, ' '), span: r.span, quoted: true });
+        break;
+      }
+      case 'TIME': {
+        flush();
+        const [h, m] = r.lexeme.split(':');
+        tokens.push({ index: tokens.length, type: 'TIME', lexeme: r.lexeme, value: `${h.padStart(2, '0')}:${m}`, span: r.span });
         break;
       }
       case 'SEMI':

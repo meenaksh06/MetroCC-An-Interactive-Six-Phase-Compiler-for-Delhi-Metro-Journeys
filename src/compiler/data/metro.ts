@@ -189,6 +189,30 @@ export const STATIONS: StationDef[] = [
 /** Minutes to walk between platforms and wait for the next train at an interchange. */
 export const INTERCHANGE_MIN = 5;
 
+/**
+ * Approximate passenger service window (minutes after midnight). DMRC's first
+ * and last trains vary by line and station; this is a simplified model used
+ * only for warnings.
+ */
+export const SERVICE_START_MIN = 5 * 60 + 30; // 05:30
+export const SERVICE_END_MIN = 23 * 60 + 30; // 23:30
+
+/** "HH:MM" → minutes after midnight, or undefined if it is not a valid 24-hour time. */
+export function parseClock(hhmm: string): number | undefined {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm);
+  if (!m) return undefined;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h > 23 || min > 59) return undefined;
+  return h * 60 + min;
+}
+
+/** minutes after midnight → "HH:MM" (wraps past midnight). */
+export const formatClock = (t: number) => {
+  const d = ((Math.round(t) % 1440) + 1440) % 1440;
+  return `${String(Math.floor(d / 60)).padStart(2, '0')}:${String(d % 60).padStart(2, '0')}`;
+};
+
 /** Running time model: ~1.5 min per km plus ~0.6 min dwell, rounded, minimum 1 minute. */
 export const hopMinutes = (km: number) => Math.max(1, Math.round(0.6 + km * 1.5));
 

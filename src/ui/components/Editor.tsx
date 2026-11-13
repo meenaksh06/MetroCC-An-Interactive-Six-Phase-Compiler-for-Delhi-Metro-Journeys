@@ -14,7 +14,7 @@ import { useStore } from '../store';
 // ---------------------------------------------------------------- syntax highlighting
 const lineNames = LINES.map((l) => l.id).join('|');
 const tokenRe = new RegExp(
-  `(\\/\\/.*$)|("[^"\\n]*"?)|\\b(BOARD|ON|VIA|CHANGE|AT|EXIT)\\b|\\b(${lineNames})\\b(?!\\s+(?!AT\\b|ON\\b)[A-Za-z0-9])|(;)`,
+  `(\\/\\/.*$)|("[^"\\n]*"?)|\\b(BOARD|ON|VIA|CHANGE|AT|EXIT)\\b|\\b(${lineNames})\\b(?!\\s+(?!AT\\b|ON\\b)[A-Za-z0-9])|(;)|\\b(\\d{1,2}:\\d{2})\\b`,
   'gm',
 );
 const colorOf = Object.fromEntries(LINES.map((l) => [l.id, l.color]));
@@ -25,6 +25,7 @@ const highlighter = new MatchDecorator({
     if (m[2]) return Decoration.mark({ class: 'tok-string' });
     if (m[3]) return Decoration.mark({ class: 'tok-kw' });
     if (m[4]) return Decoration.mark({ class: 'tok-line', attributes: { style: `color:${colorOf[m[4]] === '#FFCC00' ? '#e0a800' : colorOf[m[4]]}` } });
+    if (m[6]) return Decoration.mark({ class: 'tok-time' });
     return Decoration.mark({ class: 'tok-semi' });
   },
 });

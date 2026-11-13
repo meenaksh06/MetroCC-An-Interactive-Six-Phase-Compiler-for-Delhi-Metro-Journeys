@@ -246,4 +246,54 @@ EXIT Kirti Nagar;
 EXIT Rajiv Chowk;
 `,
   },
+  // ------------------------------------------------------------ departure times
+  {
+    id: 'depart-morning',
+    title: 'Morning commute with a departure time',
+    group: 'Valid journeys',
+    expect: { codes: [] },
+    source: `// AT HH:MM on the BOARD statement turns the itinerary into a clock schedule
+BOARD Jahangirpuri ON Yellow AT 08:30;
+CHANGE Violet AT Kashmere Gate;
+EXIT Mandi House;
+`,
+  },
+  {
+    id: 'depart-late',
+    title: 'Late departure: arrives after the last trains',
+    group: 'Valid journeys',
+    expect: { codes: ['W-C01'] },
+    source: `// Compiles, but code generation warns that you arrive after ~23:30
+BOARD Inderlok ON Red AT 23:15;
+CHANGE Yellow AT Kashmere Gate;
+EXIT Hauz Khas;
+`,
+  },
+  {
+    id: 'lex-time',
+    title: 'Incomplete time "08:"',
+    group: 'Lexical errors',
+    expect: { failedAt: 'lexer', codes: ['L06'] },
+    source: `BOARD Rajiv Chowk ON Yellow AT 08:;
+EXIT Hauz Khas;
+`,
+  },
+  {
+    id: 'syn-time',
+    title: 'AT without a departure time',
+    group: 'Syntax errors',
+    expect: { failedAt: 'parser', codes: ['P13'] },
+    source: `BOARD Rajiv Chowk ON Yellow AT;
+EXIT Hauz Khas;
+`,
+  },
+  {
+    id: 'sem-time',
+    title: 'Impossible departure time 25:10',
+    group: 'Semantic errors',
+    expect: { failedAt: 'semantic', codes: ['S14'] },
+    source: `BOARD Rajiv Chowk ON Yellow AT 25:10;
+EXIT Hauz Khas;
+`,
+  },
 ];

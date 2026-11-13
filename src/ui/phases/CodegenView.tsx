@@ -35,11 +35,12 @@ export function CodegenView() {
   return (
     <div className="grid h-full min-h-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.5fr)]">
       <div className="flex min-h-0 flex-col gap-3">
-        <div className="grid grid-cols-5 gap-1.5">
+        <div className={`grid gap-1.5 ${s.depart ? 'grid-cols-3 sm:grid-cols-6' : 'grid-cols-5'}`}>
           {[
             ['Stops', s.stops],
             ['Changes', s.interchanges],
             ['Time', `${s.min} min`],
+            ...(s.depart ? [['Depart → arrive', `${s.depart}→${s.arrive}`]] : []),
             ['Distance', `${s.km} km`],
             ['Fare', `₹${s.fare}`],
           ].map(([k, v]) => (
@@ -66,6 +67,7 @@ export function CodegenView() {
                 onMouseLeave={() => setHover(null)}
               >
                 <span className="text-lg">{KIND_ICON[it.kind]}</span>
+                {it.time && <span className="mono mt-0.5 h-fit rounded px-1.5 text-xs font-semibold" style={{ background: 'var(--panel)' }}>{it.time}</span>}
                 <div>
                   <div className="text-[14px] font-medium">
                     <span className="muted mr-1">{i + 1}.</span>
@@ -77,7 +79,7 @@ export function CodegenView() {
             ))}
           </ol>
           <div className="border-t px-3 py-2 text-xs muted" style={{ borderColor: 'var(--border)' }}>
-            Fare is charged on the shortest-distance path ({s.fareKm} km), as DMRC does. Time includes ~5 min per interchange.
+            Fare is charged on the shortest-distance path ({s.fareKm} km), as DMRC does. Time includes ~5 min per interchange.{s.depart ? ' Clock times are estimates from the running-time model, not a timetable.' : ' Add “AT HH:MM” to the BOARD statement for clock times.'}
           </div>
         </div>
       </div>

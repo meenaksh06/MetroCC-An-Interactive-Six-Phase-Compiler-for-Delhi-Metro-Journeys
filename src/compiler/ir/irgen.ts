@@ -4,7 +4,7 @@
  * A syntax-directed translation of the checked AST into a linear,
  * three-address-style IR (each instruction has at most three operands):
  *
- *   BOARD    line @ station
+ *   BOARD    line @ station [, HH:MM]   (optional departure time)
  *   RIDE     line, from → to
  *   PASS     station              (a VIA assertion: "the ride passes here")
  *   TRANSFER line1 → line2 @ station
@@ -13,7 +13,7 @@
  * The translation is deliberately naive (one RIDE per VIA, transfers kept
  * as written) so the optimizer has something to improve.
  */
-import { INTERCHANGE_MIN, fareBetween, rideInfo, round1 } from '../data/graph';
+import { INTERCHANGE_MIN, fareBetween, formatClock, rideInfo, round1 } from '../data/graph';
 import type { Journey } from '../semantic/semantic';
 import type { LineId, PhaseResult, Span } from '../types';
 
@@ -32,6 +32,7 @@ export interface IRInstr {
   km?: number;
   min?: number;
   towards?: string;
+  time?: number; // BOARD: departure time, minutes after midnight
   stmt: number; // source statement (for linked highlighting)
   span: Span;
   note?: string; // why the instruction was created / changed
@@ -65,7 +66,7 @@ export type IRStep = { instr: number; message: string };
 export function formatInstr(i: IRInstr): string {
   switch (i.op) {
     case 'BOARD':
-      return `BOARD    ${i.line} @ ${i.station}`;
+      return `BOARD    ${i.line} @ ${i.station}${i.time !== undefined ? `, ${formatClock(i.time)}` : ''}`;
     case 'RIDE':
       return `RIDE     ${i.line}, ${i.from} → ${i.to}`;
     case 'PASS':
@@ -99,7 +100,10 @@ export function generateIR(journey: Journey): PhaseResult<IROutput, IRStep> {
     const r = journey.resolved[k];
     switch (s.kind) {
       case 'board':
-        emit({ id: id(), op: 'BOARD', line, station: pos, stmt: k, span: s.span }, `BOARD statement (line ${s.span.start.line})`);
+        emit(
+          { id: id(), op: 'BOARD', line, station: pos, stmt: k, span: s.span, ...(journey.depart !== undefined ? { time: journey.depart } : {}) },
+          `BOARD statement (line ${s.span.start.line})${journey.depart !== undefined ? ', with departure time' : ''}`,
+        );
         break;
       case 'via':
         if (r.station !== pos) emit(ride(id(), line, pos, r.station, k, s.span), `ride to the VIA station`);

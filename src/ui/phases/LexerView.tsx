@@ -8,7 +8,7 @@ import { useStore } from '../store';
 
 const TOKEN_COLOR: Record<string, string> = {
   BOARD: '#c084fc', ON: '#c084fc', VIA: '#c084fc', CHANGE: '#c084fc', AT: '#c084fc', EXIT: '#c084fc',
-  NAME: '#38bdf8', SEMI: '#94a3b8', EOF: '#94a3b8', WORD: '#38bdf8', QUOTED: '#34d399', WS: '#64748b', COMMENT: '#64748b', ERROR: '#ef4444',
+  NAME: '#38bdf8', TIME: '#f59e0b', SEMI: '#94a3b8', EOF: '#94a3b8', WORD: '#38bdf8', QUOTED: '#34d399', WS: '#64748b', COMMENT: '#64748b', ERROR: '#ef4444',
 };
 
 export function LexerView() {
@@ -180,7 +180,7 @@ const R = 24;
 
 function DfaDiagram({ active, usedEdge, emitted, error, stepKey }: { active?: StateId; usedEdge?: string; emitted?: StateId; error: boolean; stepKey: number }) {
   return (
-    <svg viewBox="0 20 700 470" className="h-full max-h-[480px] w-full">
+    <svg viewBox="0 -100 700 590" className="h-full max-h-[560px] w-full">
       <defs>
         <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
           <path d="M0,0 L10,5 L0,10 z" fill="var(--muted)" />
