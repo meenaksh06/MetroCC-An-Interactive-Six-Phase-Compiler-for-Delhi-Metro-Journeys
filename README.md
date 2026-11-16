@@ -13,6 +13,8 @@ MetroCC is an interactive web app that compiles a small domain-specific language
 
 The compiler is pure TypeScript in [src/compiler/](src/compiler/). It has no backend and uses no parser generator: the lexer and parser are hand-written. Every phase is a pure function that returns `{ ok, result, steps, diagnostics }`; the UI animates the `steps`.
 
+> 📖 **Comprehensive Architectural & Theory Summary**: For a complete deep-dive covering the formal 5/6 compiler phases, DFA state machines, LL(1) PDA proofs, L-attributed grammar definitions, 3AC intermediate code, optimization passes, and target code generation, see [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md).
+
 ---
 
 ## Running it
